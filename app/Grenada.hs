@@ -1,4 +1,4 @@
-module Main where
+Cmodule Main where
 
 import System.Directory
 import System.IO
@@ -6,6 +6,8 @@ import System.FilePath
 import Control.Monad
 import Data.List
 import System.Process (callCommand)
+import System.Process (callCommand, system)
+import System.Exit (ExitCode(..))
 
 main :: IO ()
 main = do
@@ -48,6 +50,29 @@ loop cwd = do
             createDirectory dirPath
             putStrLn "Directory created."
             loop cwd
+        ("rmdir":dir:_) -> do  -- NEW COMMAND
+            let dirPath = cwd </> dir
+            exists <- doesDirectoryExist dirPath
+            if exists
+                then removeDirectoryRecursive dirPath >> putStrLn "Directory removed."
+                else putStrLn "Directory does not exist."
+            loop cwd
+        ("touch":file:_) -> do  -- NEW COMMAND
+            let filePath = cwd </> file
+            writeFile filePath ""
+            putStrLn "File created."
+            loop cwd
+        ("unzip":zipfile:_) -> do  -- NEW COMMAND
+            let zipPath = cwd </> zipfile
+            exists <- doesFileExist zipPath
+            if exists
+                then do
+                    code <- system $ "unzip -o \"" ++ zipPath ++ "\" -d \"" ++ cwd ++ "\""
+                    case code of
+                        ExitSuccess   -> putStrLn "Unzipped successfully."
+                        ExitFailure _ -> putStrLn "Failed to unzip file."
+                else putStrLn "Zip file does not exist."
+            loop cwd
         ("pwd":_) -> do
             putStrLn (normalise cwd)
             loop cwd
@@ -55,7 +80,7 @@ loop cwd = do
             callCommand "clear"
             loop cwd
         ("help":_) -> do
-            putStrLn "Commands: ls, cd <dir>, cat <file>, rm <file>, mkdir <dir>, pwd, clear, help, exit"
+            putStrLn "Commands: ls, cd <dir>, cat <file>, rm <file>, rmdir <dir>, touch <file>, unzip <file.zip>, mkdir <dir>, pwd, clear, help, exit"
             loop cwd
         ("exit":_) -> putStrLn "Exiting file manager."
         _ -> do
