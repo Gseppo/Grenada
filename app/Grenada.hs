@@ -33,7 +33,7 @@ makeTarEntry cwd relPath = do
         let tarPath = Tar.toTarPath False relPath
         case tarPath of
           Left err -> error ("Invalid tar path: " ++ show err)
-          Right tp -> return $ Tar.simpleEntry tp contents
+          Right tp -> return $ Tar.simpleEntry tp (Tar.NormalFile contents (BL.length contents))
 
 -- Extract Tar.Entries into a directory
 extractTarEntries :: FilePath -> Tar.Entries Tar.FormatError -> IO ()
