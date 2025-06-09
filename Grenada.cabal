@@ -76,7 +76,9 @@ executable Grenada
                       directory >=1.3 && <1.4,
                       filepath >=1.4 && <1.5,
                       process >=1.6 && <1.7,
-                      time >=1.8
+                      time >=1.8,
+                      tar,
+                      bytestring
 
     -- Directories containing source files.
     hs-source-dirs:   app
