@@ -13,6 +13,42 @@ import qualified Codec.Archive.Tar as Tar
 import qualified Codec.Archive.Tar.Entry as Tar
 import qualified Data.ByteString.Lazy as BL
 
+-- ADDITION: Tar utility functions for making and extracting entries
+
+-- Create a Tar.Entry from a file in the filesystem
+makeTarEntry :: FilePath -> FilePath -> IO Tar.Entry
+makeTarEntry cwd relPath = do
+    let absPath = cwd </> relPath
+    isDir <- doesDirectoryExist absPath
+    if isDir
+      then do
+        -- Directory: create empty entry with directory flag
+        let tarPath = Tar.toTarPath True relPath
+        case tarPath of
+          Left err -> error ("Invalid tar path: " ++ show err)
+          Right tp -> return $ Tar.directoryEntry tp
+      else do
+        -- File: read contents and create entry
+        contents <- BL.readFile absPath
+        let tarPath = Tar.toTarPath False relPath
+        case tarPath of
+          Left err -> error ("Invalid tar path: " ++ show err)
+          Right tp -> return $ Tar.simpleEntry tp contents
+
+-- Extract Tar.Entries into a directory
+extractTarEntries :: FilePath -> Tar.Entries Tar.FormatError -> IO ()
+extractTarEntries _ Tar.Done = return ()
+extractTarEntries _ (Tar.Fail err) = putStrLn $ "Tar extraction error: " ++ show err
+extractTarEntries cwd (Tar.Next entry rest) = do
+    let path = cwd </> Tar.fromTarPathToPosixPath (Tar.entryTarPath entry)
+    case Tar.entryContent entry of
+      Tar.NormalFile contents _ -> do
+        createDirectoryIfMissing True (takeDirectory path)
+        BL.writeFile path contents
+      Tar.Directory -> createDirectoryIfMissing True path
+      _ -> return () -- skip other entry types
+    extractTarEntries cwd rest
+
 main :: IO ()
 main = do
     putStrLn "Welcome to Grenada"
@@ -113,5 +149,4 @@ loop cwd = do
             callCommand "clear"
             loop cwd
         ("help":_) -> do
-            putStrLn "Commands: ls, cd <dir>, cat <file>, rm <file>, rmdir <dir>, touch <file>, unzip <file.zip>, mkdir <dir>, pwd, clear, help, exit
-
+            putStrLn "Commands: ls, cd <dir>, cat <file>, rm <file>, rmdir <dir>, touch <file>, unzip <file.zip>, mkdir <dir>, pwd, clear, help, exit"
