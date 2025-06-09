@@ -5,15 +5,20 @@ import System.IO
 import System.FilePath
 import Control.Monad
 import Data.List
-import System.Process (callCommand)
 import System.Process (callCommand, system)
 import System.Exit (ExitCode(..))
+
+-- Imports for TAR archive support (pure Haskell)
+import qualified Codec.Archive.Tar as Tar
+import qualified Codec.Archive.Tar.Entry as Tar
+import qualified Data.ByteString.Lazy as BL
 
 main :: IO ()
 main = do
     putStrLn "Welcome to Grenada"
     loop "."
 
+-- The main command loop for the CLI file manager.
 loop :: FilePath -> IO ()
 loop cwd = do
     putStr $ cwd ++ " > "
@@ -50,19 +55,19 @@ loop cwd = do
             createDirectory dirPath
             putStrLn "Directory created."
             loop cwd
-        ("rmdir":dir:_) -> do  -- NEW COMMAND
+        ("rmdir":dir:_) -> do
             let dirPath = cwd </> dir
             exists <- doesDirectoryExist dirPath
             if exists
                 then removeDirectoryRecursive dirPath >> putStrLn "Directory removed."
                 else putStrLn "Directory does not exist."
             loop cwd
-        ("touch":file:_) -> do  -- NEW COMMAND
+        ("touch":file:_) -> do
             let filePath = cwd </> file
             writeFile filePath ""
             putStrLn "File created."
             loop cwd
-        ("unzip":zipfile:_) -> do  -- NEW COMMAND
+        ("unzip":zipfile:_) -> do
             let zipPath = cwd </> zipfile
             exists <- doesFileExist zipPath
             if exists
@@ -73,6 +78,34 @@ loop cwd = do
                         ExitFailure _ -> putStrLn "Failed to unzip file."
                 else putStrLn "Zip file does not exist."
             loop cwd
+
+        -- TAR archiving: creates a .tar archive from files/directories
+        -- Usage: Tar <archive.tar> <files...>
+        ("Tar":tarfile:files) -> do
+            let tarPath = cwd </> tarfile
+            -- Create TAR entries for each file/directory listed
+            entries <- mapM (makeTarEntry cwd) files
+            -- Write the archive to disk
+            BL.writeFile tarPath (Tar.write entries)
+            putStrLn $ "Created TAR archive: " ++ tarPath
+            loop cwd
+
+        -- DeTar: extract a .tar archive into the current directory
+        -- Usage: DeTar <archive.tar>
+        ("DeTar":tarfile:_) -> do
+            let tarPath = cwd </> tarfile
+            exists <- doesFileExist tarPath
+            if exists
+                then do
+                    -- Read and parse the .tar archive
+                    content <- BL.readFile tarPath
+                    let entries = Tar.read content
+                    -- Extract all files and directories
+                    extractTarEntries cwd entries
+                    putStrLn "Extracted TAR archive."
+                else putStrLn "TAR file does not exist."
+            loop cwd
+
         ("pwd":_) -> do
             putStrLn (normalise cwd)
             loop cwd
@@ -80,9 +113,5 @@ loop cwd = do
             callCommand "clear"
             loop cwd
         ("help":_) -> do
-            putStrLn "Commands: ls, cd <dir>, cat <file>, rm <file>, rmdir <dir>, touch <file>, unzip <file.zip>, mkdir <dir>, pwd, clear, help, exit"
-            loop cwd
-        ("exit":_) -> putStrLn "Exiting file manager."
-        _ -> do
-            putStrLn "Unknown command. Type 'help' for list of commands."
-            loop cwd
+            putStrLn "Commands: ls, cd <dir>, cat <file>, rm <file>, rmdir <dir>, touch <file>, unzip <file.zip>, mkdir <dir>, pwd, clear, help, exit
+
