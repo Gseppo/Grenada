@@ -1,4 +1,4 @@
-Cmodule Main where
+module Main where
 
 import System.Directory
 import System.IO
